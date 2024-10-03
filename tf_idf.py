@@ -7,10 +7,11 @@ Author: Paulo Ribeiro
 import os
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
 import matplotlib.pyplot as plt
 import joblib
+from tqdm import tqdm
 from scipy import sparse
+from data_loader import clean_sentence
 
 
 class TFIDFTrainer:
@@ -148,50 +149,70 @@ class TFIDFTrainer:
         # Create a folder named "tf_idf_matrix"
         os.makedirs("tf_idf_matrix", exist_ok=True)
 
+        # Add the idf vector to the results to store
+        results = self.tf_idf
+        results['idf'] = self.idf
+        results['dictionary'] = self.dictionary
+
         # Save the sparse dictionary using joblib
-        joblib.dump(self.tf_idf, f'tf_idf_matrix/tf_idf_{self.lang}.pkl', compress=True)
-
-
-        # TODO: Implementation using sparse matrix efficient object ?
-        # def _tf(self, text: list[str]):
-        #    """Compute Term Frequency (TF) for a document."""
-        #    # Count the number of occurrence of each words in the document
-        #    term_count = defaultdict(int)
-        #    for word in text:
-        #        term_count[word] += 1
-        #
-        #    # Compute the number of words in the document
-        #    doc_length = len(text)
-        #
-        #    # Build sparse vector for memory efficiency(TF)
-        #    row_idx, col_idx, tf = [], [], []
-        #    for word, count in term_count.items():
-        #        row_idx.append(0)  # vector so one dimensionality
-        #        col_idx.append(self.dictionary.index(word))  # Column index of the word
-        #        tf.append(count / doc_length)  # TF value
-        #
-        #    print(len(row_idx), "\n###############\n", len(col_idx), "\n\n###############\n\n", len(tf))
-        #
-        #    return csr_matrix((tf, (row_idx, col_idx)), shape=(1, self.dict_len))
-        #
-        # def _idf(self, vocab_size: int):
-        #    """Compute the Inverse Document Frequency (IDF) across the corpus."""
-        #    doc_count = len(self.corpus)
-        #    doc_freq = np.zeros(vocab_size)
-        #
-        #    # Accumulate document frequencies
-        #    for tf_matrix in self.corpus['tf']:
-        #        doc_freq += (tf_matrix > 0).toarray().flatten()
-        #
-        #    # Compute IDF
-        #    return np.log((1 + doc_count) / (1 + doc_freq)) + 1
+        joblib.dump(results, f'tf_idf_matrix/tf_idf_{self.lang}.pkl', compress=True)
 
 
 class TFIDFRetriever:
     def __init__(self, tf_idf_matrix_path: str):
         self.tf_idf_matrix_path = tf_idf_matrix_path
-        self.tf_idf = self._load_tf_idf()
+        self.tf_idf = joblib.load(self.tf_idf_matrix_path)
+        self.idf = self.tf_idf['idf']
+        self.dictionary = self.tf_idf['dictionary']
+        for key in ['idf', 'dictionary']:
+            del self.tf_idf[key]
 
-    def _load_tf_idf(self):
-        """Load the TF-IDF matrix already computed with TFIDFTrainer method"""
-        pass
+    def _tf(self, text: list[str]):
+        """Compute the Term Frequency (TF) of a text."""
+        # Initiate the counter and compute the length of document
+        counter = dict.fromkeys(self.dictionary, 0)
+        N = len(text)
+
+        # Count the words
+        for word in text:
+            if word in self.dictionary:
+                counter[word] += 1
+
+        return np.array([freq / N for _, freq in counter.items()])
+
+    @staticmethod
+    def _cos_similarity(query_vect, doc_vect):
+        # Compute the dot product
+        dot_product = np.dot(query_vect, doc_vect)
+
+        # Compute the magnitudes of the vectors
+        magnitude_a = np.linalg.norm(query_vect)
+        magnitude_b = np.linalg.norm(doc_vect)
+
+        # Handle the case of zero magnitude to avoid division by zero
+        if magnitude_a == 0 or magnitude_b == 0:
+            return 0.0  # or raise an exception if preferred
+
+        # Calculate cosine similarity
+        cosine_sim = dot_product / (magnitude_a * magnitude_b)
+
+        return cosine_sim
+
+    def search(self, query: str, lang: str, topk: int = 5, present_results: bool = False):
+        """TODO"""
+        clean_query = clean_sentence(query, lang)
+        query_tf = self._tf(clean_query.split())
+        query_tf_idf = query_tf * self.idf
+
+        # Compute the cosine similarity between the query and each vector
+        similarity = {}
+        for docid, doc_tf_idf in self.tf_idf.items():
+            similarity[docid] = self._cos_similarity(query_tf_idf, doc_tf_idf.toarray().reshape(len(self.dictionary), ))
+
+        # Return the top k documents with higher similarity
+        relevant_docs = dict(sorted(similarity.items(), key=lambda item: item[1], reverse=True)[:topk])
+
+        if present_results:
+            print(f"The top {topk} documents are:")
+            for docid, sim in relevant_docs.items():
+                print(f"{docid}: {sim}")
