@@ -8,6 +8,23 @@ from tqdm.notebook import tqdm
 from nltk.corpus import stopwords
 
 
+korean_stopwords = [
+    "이", "그", "저", "것", "저것", "그것", "그러나", "그래서", "또한", "하지만",
+    "그렇지만", "그리고", "또한", "또는", "만약", "만약에", "왜냐하면", "때문에", 
+    "따라서", "등", "그들", "그녀", "그녀들", "그들", "있다", "없다", "하다", 
+    "되다", "아니다", "이다", "에", "에서", "와", "과", "하고", "나", "너", "너희", 
+    "나의", "그의", "그녀의", "우리", "너희의", "그들의", "저희", "나에게", 
+    "너에게", "그에게", "우리에게", "너희에게", "이곳", "그곳", "저곳", "이런", 
+    "저런", "그런", "이런저런", "모든", "매우", "아주", "좀", "조금", "너무", 
+    "많이", "자주", "가끔", "항상", "정말", "진짜", "그냥", "벌써", "이제", 
+    "다시", "너무나", "항상", "자꾸", "나중에", "한편", "게다가", "덕분에", 
+    "아직", "하여튼", "어쨌든", "바로", "때때로", "한때", "잠시", "잠깐", 
+    "갑자기", "확실히", "대개", "거의", "무척", "역시", "정말로", "분명히", 
+    "따로", "서로", "마치", "도대체"
+]
+
+korean_stopwords = set(korean_stopwords)
+
 # Pre-define stopwords for each language
 STOPWORDS_DICT = {
     'en': set(stopwords.words('english')),
@@ -16,7 +33,7 @@ STOPWORDS_DICT = {
     'es': set(stopwords.words('spanish')),
     'it': set(stopwords.words('italian')),
     'ar': set(stopwords.words('arabic')),
-    'ko': None  # Korean stopwords handling may need custom work; an empty set for now
+    'ko': korean_stopwords  # Korean stopwords handling may need custom work; an empty set for now
 }
 
 
