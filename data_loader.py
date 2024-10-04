@@ -6,6 +6,9 @@ import re
 import pandas as pd
 from tqdm.notebook import tqdm
 from nltk.corpus import stopwords
+from nltk.stem import PorterStemmer, SnowballStemmer
+from nltk.stem.isri import ISRIStemmer
+from konlpy.tag import Okt
 
 
 korean_stopwords = [
@@ -36,6 +39,17 @@ STOPWORDS_DICT = {
     'ko': korean_stopwords  # Korean stopwords handling may need custom work; an empty set for now
 }
 
+# Initialize stemmers
+english_stemmer = PorterStemmer()  # For English
+snowball_stemmers = {  # For multiple languages
+    'fr': SnowballStemmer('french'),
+    'de': SnowballStemmer('german'),
+    'es': SnowballStemmer('spanish'),
+    'it': SnowballStemmer('italian')
+}
+arabic_stemmer = ISRIStemmer()  # For Arabic
+korean_stemmer = Okt()  # For Korean
+
 
 def clean_sentence(text, lang):
     """
@@ -63,6 +77,50 @@ def clean_sentence(text, lang):
 
     else:
         return text
+    
+
+def clean_sentence_2(text, lang):
+    """
+    Cleans the input text by:
+    1. Lowercasing the text
+    2. Removing stopwords for the specified language
+    3. Removing non-alphabetic characters
+    """
+    # Get stopwords for the language
+    lang_stopwords = STOPWORDS_DICT.get(lang, set())
+
+    # Convert to lowercase
+    text = text.lower()
+
+    # Check if the language have stopwords or not (i.e. korean)
+    if lang_stopwords:
+        # Remove non-alphabetic characters and split into words
+        words = re.findall(r'\b\w+\b', text)
+
+        # Remove stopwords
+        words_cleaned = [word for word in words if word not in lang_stopwords]
+
+        #perform stemming 
+        # Perform stemming based on language
+        if lang == 'en':
+            # Stem words using English stemmer
+            words_cleaned = [english_stemmer.stem(word) for word in words_cleaned]
+        elif lang in snowball_stemmers:
+            # Stem words using SnowballStemmer for French, German, Spanish, and Italian
+            words_cleaned = [snowball_stemmers[lang].stem(word) for word in words_cleaned]
+        elif lang == 'ar':
+            # Stem words using Arabic ISRIStemmer
+            words_cleaned = [arabic_stemmer.stem(word) for word in words_cleaned]
+        elif lang == 'ko':
+            # Perform stemming using the Korean Okt stemmer
+            words_cleaned = [korean_stemmer.morphs(word)[0] for word in words_cleaned]
+
+        # Join the words back into a sentence
+        return ' '.join(words_cleaned)
+
+    else:
+        return text
+
 
 
 def split_clean_corpus_per_lang(corpus_path: str = 'data/corpus.json/corpus.json'):
