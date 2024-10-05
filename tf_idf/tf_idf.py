@@ -25,7 +25,7 @@ class TFIDFTrainer:
         self.dict_len = 0
 
     def _load_data(self):
-        """Load the cleaned data and transform it to have a constant pattern across words,
+        """Load the cleaned data, meaning a transformed documents to have a constant pattern across words,
         meaning no uppercase letter, etc."""
         # Load the data
         print("Loading corpus...")
