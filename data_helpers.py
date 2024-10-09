@@ -4,8 +4,14 @@ Python script to help the loading of data of all kinds of datasets
 
 import re
 import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
 from tqdm.notebook import tqdm
 from nltk.corpus import stopwords
+
+# Enable tqdm for pandas
+tqdm.pandas()
+
 
 
 # Pre-define stopwords for each language
@@ -18,7 +24,6 @@ STOPWORDS_DICT = {
     'ar': set(stopwords.words('arabic')),
     'ko': None  # Korean stopwords handling may need custom work; an empty set for now
 }
-
 
 def clean_sentence(text, lang):
     """
@@ -77,3 +82,27 @@ def split_clean_corpus_per_lang(corpus_path: str = 'data/corpus.json/corpus.json
         lang_df.to_json(filename, orient='records', lines=True)
 
         print(f'Saved: {filename}')
+
+
+def corpus_langs(corpus: pd.DataFrame):
+    """Print the different languages we have in the corpus."""
+    langs = corpus['lang'].unique()
+
+    print(f"The corpus contains these languages:\n{langs}")
+
+
+def corpus_text_length(corpus: pd.DataFrame):
+    """Display the distribution of the length, base on the word splitting basis, of our documents."""
+    corpus_length: pd.Series = corpus.progress_apply(lambda row: len(row['text'].split()), axis=1)
+
+    plt.figure()
+
+    # Plotting the histogram
+    sns.histplot(corpus_length)
+
+    # Adding x-label and title
+    plt.xlabel('Number of Words')
+    plt.title('Distribution of Document Lengths')
+
+    # Display the plot
+    plt.show()

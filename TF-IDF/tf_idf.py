@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import joblib
 from tqdm import tqdm
 from scipy import sparse
-from data_loader import clean_sentence
+from data_helpers import clean_sentence
 
 
 class TFIDFTrainer:
