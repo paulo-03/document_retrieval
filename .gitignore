@@ -1,6 +1,9 @@
 #Ignore Pycharm metadata
 .idea
 
+# Ignore output folder
+output
+
 # Ignore all .zip files
 *.zip
 
