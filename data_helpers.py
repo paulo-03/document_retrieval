@@ -5,10 +5,12 @@ Python script to help the loading of data of all kinds of datasets
 import re
 import spacy
 import pandas as pd
+import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 from tqdm.notebook import tqdm
 from nltk.corpus import stopwords
+from multiprocessing import Pool
 
 # Pre-define stopwords for each language (you can keep your STOPWORDS_DICT)
 STOPWORDS_DICT = {
@@ -23,11 +25,11 @@ STOPWORDS_DICT = {
 
 # Load spaCy models for different languages
 SPACY_MODELS = {
-    'en': spacy.load('en_core_web_sm'),
-    'fr': spacy.load('fr_core_news_sm'),
-    'de': spacy.load('de_core_news_sm'),
-    'es': spacy.load('es_core_news_sm'),
-    'it': spacy.load('it_core_news_sm'),
+    'en': spacy.load('en_core_web_sm', disable=['tagger', 'parser', 'ner']),
+    'fr': spacy.load('fr_core_news_sm', disable=['tagger', 'parser', 'ner']),
+    'de': spacy.load('de_core_news_sm', disable=['tagger', 'parser', 'ner']),
+    'es': spacy.load('es_core_news_sm', disable=['tagger', 'parser', 'ner']),
+    'it': spacy.load('it_core_news_sm', disable=['tagger', 'parser', 'ner']),
     'ar': None,  # No spaCy model for Arabic ('ar'); an empty set for now
     'ko': None  # No spaCy model for Korean ('ko'); an empty set for now
 }
@@ -91,38 +93,45 @@ class CorpusClean:
         # Display the words statistics of current split corpus
         return self._docs_stats_()
 
-    def lemmatization(self):
+    @staticmethod
+    def _lemmatize_one_chunk(chunk, nlp):
+        """Function to lemmatize a single chunk of texts"""
+        return [' '.join([token.lemma_ for token in nlp(str(text))]) for text in chunk]
+
+    def lemmatization(self, cpu_available: int = 2):
         """Efficiently lemmatize the documents in the corpus."""
 
         for lang, docs in self.corpus_clean.items():
             # Get the appropriate spaCy model for the language
             nlp = SPACY_MODELS.get(lang)
 
-            if nlp is None:
-                print(f"No spaCy model found for language '{lang}'. Skipping lemmatization for this language.")
-                continue
+            if nlp:
+                # Split the documents into chunks for parallel processing
+                texts_chunk = [text for text in np.array_split(docs['text'].tolist(), cpu_available)]
 
-            # Lemmatize the text of the documents using nlp.pipe() for efficiency
-            texts = docs['text'].tolist()[:1000]
-            lemmatized_texts = []
+                # Use multiprocessing to lemmatize the chunks in parallel
+                with Pool(cpu_available) as pool:
+                    results = pool.starmap(self._lemmatize_one_chunk, [(chunk, nlp) for chunk in texts_chunk])
 
-            # Use nlp.pipe() for batch processing of the texts
-            for doc in tqdm(nlp.pipe(texts, batch_size=100, n_process=2, disable=["parser", "ner"]),
-                            total=len(texts),
-                            desc=f"Lemmatizing {lang}"):
-                lemmatized_text = ' '.join([token.lemma_ for token in doc])
-                lemmatized_texts.append(lemmatized_text)
+                # Flatten the results (list of lists) into a single list
+                lemmatized_texts = [text for sublist in results for text in sublist]
 
-            # Update the 'text' column with the lemmatized text
-            docs['text'] = pd.Series(lemmatized_texts)
+                # Update the 'text' column with the lemmatized text
+                docs['text'] = pd.Series(lemmatized_texts)
 
-            # Update the corpus_clean variable
-            self.corpus_clean[lang] = docs
+                # Update the corpus_clean variable
+                self.corpus_clean[lang] = docs
+
+                # Display information to the user
+                print(f"Finished lemmatizing '{lang}' docs!")
+
+        # Display the words statistics of current split corpus
+        return self._docs_stats_()
 
     def store(self, path: str):
         """TODO"""
         for lang, docs in tqdm(self.corpus_clean.items(), desc="Storing current clean dataset into disk"):
-            docs.to_json(f'{path}/clean_corpus_{lang}.json.gz', orient='records', lines=True, compression='gzip')
+            docs.to_json(f'{path}/clean_corpus_{lang}.json', orient='records', lines=True)
 
     def show_current_docs(self):
         """TODO"""
