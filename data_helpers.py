@@ -56,7 +56,7 @@ class CorpusClean:
         }
 
         # Display the words statistics of current split corpus
-        self._docs_stats_()
+        return self._docs_stats_()
 
     def lower_case(self):
         """TODO"""
@@ -89,15 +89,40 @@ class CorpusClean:
                 self.corpus_clean[lang] = docs
 
         # Display the words statistics of current split corpus
-        self._docs_stats_()
+        return self._docs_stats_()
 
     def lemmatization(self):
-        """TODO"""
-        ...
+        """Efficiently lemmatize the documents in the corpus."""
 
-    def store(self):
+        for lang, docs in self.corpus_clean.items():
+            # Get the appropriate spaCy model for the language
+            nlp = SPACY_MODELS.get(lang)
+
+            if nlp is None:
+                print(f"No spaCy model found for language '{lang}'. Skipping lemmatization for this language.")
+                continue
+
+            # Lemmatize the text of the documents using nlp.pipe() for efficiency
+            texts = docs['text'].tolist()[:1000]
+            lemmatized_texts = []
+
+            # Use nlp.pipe() for batch processing of the texts
+            for doc in tqdm(nlp.pipe(texts, batch_size=100, n_process=2, disable=["parser", "ner"]),
+                            total=len(texts),
+                            desc=f"Lemmatizing {lang}"):
+                lemmatized_text = ' '.join([token.lemma_ for token in doc])
+                lemmatized_texts.append(lemmatized_text)
+
+            # Update the 'text' column with the lemmatized text
+            docs['text'] = pd.Series(lemmatized_texts)
+
+            # Update the corpus_clean variable
+            self.corpus_clean[lang] = docs
+
+    def store(self, path: str):
         """TODO"""
-        ...
+        for lang, docs in tqdm(self.corpus_clean.items(), desc="Storing current clean dataset into disk"):
+            docs.to_json(f'{path}/clean_corpus_{lang}.json.gz', orient='records', lines=True, compression='gzip')
 
     def show_current_docs(self):
         """TODO"""
