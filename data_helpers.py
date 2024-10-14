@@ -10,7 +10,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from tqdm.notebook import tqdm
 from nltk.corpus import stopwords
-from multiprocessing import Pool
+from multiprocessing import Pool, cpu_count
 
 # Pre-define stopwords for each language (you can keep your STOPWORDS_DICT)
 STOPWORDS_DICT = {
@@ -25,11 +25,11 @@ STOPWORDS_DICT = {
 
 # Load spaCy models for different languages
 SPACY_MODELS = {
-    'en': spacy.load('en_core_web_sm', disable=['tagger', 'parser', 'ner']),
-    'fr': spacy.load('fr_core_news_sm', disable=['tagger', 'parser', 'ner']),
-    'de': spacy.load('de_core_news_sm', disable=['tagger', 'parser', 'ner']),
-    'es': spacy.load('es_core_news_sm', disable=['tagger', 'parser', 'ner']),
-    'it': spacy.load('it_core_news_sm', disable=['tagger', 'parser', 'ner']),
+    'en': spacy.load('en_core_web_sm', disable=['parser', 'ner']),
+    'fr': spacy.load('fr_core_news_sm', disable=['parser', 'ner']),
+    'de': spacy.load('de_core_news_sm', disable=['parser', 'ner']),
+    'es': spacy.load('es_core_news_sm', disable=['parser', 'ner']),
+    'it': spacy.load('it_core_news_sm', disable=['parser', 'ner']),
     'ar': None,  # No spaCy model for Arabic ('ar'); an empty set for now
     'ko': None  # No spaCy model for Korean ('ko'); an empty set for now
 }
@@ -37,14 +37,14 @@ SPACY_MODELS = {
 
 class CorpusClean:
     """Class to apply some methods to a corpus for pre-processing purpose"""
-
     def __init__(self, corpus_path):
         # Load the entire corpus (~3 min with my CPU, MacPro 2016, 2,5 GHz, Intel I7)
         print("Loading corpus... (can take up to 3 minutes)")
-        self.corpus = pd.read_json(corpus_path)
+        self.corpus = pd.read_json(corpus_path).head(1000)
         print("Corpus Loaded ! \n")
 
         self.corpus_clean = None
+        self.nlp = None
 
     def split_per_lang(self):
         """TODO"""
@@ -73,7 +73,6 @@ class CorpusClean:
 
     def stop_words(self):
         """TODO"""
-
         for lang, docs in self.corpus_clean.items():
             # Get stopwords for the language
             lang_stopwords = STOPWORDS_DICT.get(lang)
@@ -93,28 +92,20 @@ class CorpusClean:
         # Display the words statistics of current split corpus
         return self._docs_stats_()
 
-    @staticmethod
-    def _lemmatize_one_chunk(chunk, nlp):
+    def _lemmatize(self, text):
         """Function to lemmatize a single chunk of texts"""
-        return [' '.join([token.lemma_ for token in nlp(str(text))]) for text in chunk]
+        return ' '.join([token.lemma_ for token in self.nlp(text)])
 
-    def lemmatization(self, cpu_available: int = 2):
+    def lemmatization(self):
         """Efficiently lemmatize the documents in the corpus."""
-
         for lang, docs in self.corpus_clean.items():
             # Get the appropriate spaCy model for the language
-            nlp = SPACY_MODELS.get(lang)
+            self.nlp = SPACY_MODELS.get(lang)
 
-            if nlp:
-                # Split the documents into chunks for parallel processing
-                texts_chunk = [text for text in np.array_split(docs['text'].tolist(), cpu_available)]
-
-                # Use multiprocessing to lemmatize the chunks in parallel
-                with Pool(cpu_available) as pool:
-                    results = pool.starmap(self._lemmatize_one_chunk, [(chunk, nlp) for chunk in texts_chunk])
-
-                # Flatten the results (list of lists) into a single list
-                lemmatized_texts = [text for sublist in results for text in sublist]
+            if self.nlp:
+                # Use multiprocessing to lemmatize the texts in parallel
+                with Pool(cpu_count() // 2) as pool:
+                    lemmatized_texts = pool.map(self._lemmatize, docs['text'])
 
                 # Update the 'text' column with the lemmatized text
                 docs['text'] = pd.Series(lemmatized_texts)
@@ -135,7 +126,6 @@ class CorpusClean:
 
     def show_current_docs(self):
         """TODO"""
-
         print(f"{'-' * 50}\n"
               "Current state of documents (first 300 characters):\n"
               f"{'-' * 50}\n")
@@ -182,7 +172,6 @@ class CorpusClean:
 
 class CorpusAnalysis:
     """Class to apply some methods to a corpus for analysis purpose"""
-
     def __init__(self, corpus_path):
         # Load the entire corpus (~3 min with my CPU, MacPro 2016, 2,5 GHz, Intel I7)
         print("Loading corpus... (can take up to 3 minutes)")
@@ -233,70 +222,6 @@ class CorpusAnalysis:
         plt.show()
 
 
-def clean_sentence(text, lang):
-    """
-    Cleans the input text by:
-    1. Lowercasing the text
-    2. Removing stopwords for the specified language
-    3. Removing non-alphabetic characters
-    4. Lemmatizing the words using spaCy
-    """
-    # Get stopwords for the language
-    lang_stopwords = STOPWORDS_DICT.get(lang)
-
-    # Convert to lowercase
-    text = text.lower()
-
-    # Check if the language has stopwords or not (i.e., Korean)
-    if lang_stopwords:
-        # Remove non-alphabetic characters and split into words
-        words = re.findall(r'\b\w+\b', text)
-
-        # Remove stopwords
-        words_cleaned = [word for word in words if word not in lang_stopwords]
-
-        # Load the appropriate spaCy model
-        nlp = SPACY_MODELS.get(lang)
-
-        if nlp:
-            # Apply the spaCy model to the cleaned text for lemmatization
-            doc = nlp(' '.join(words_cleaned))
-            words_lemmatized = [token.lemma_ for token in doc]
-
-            # Join the lemmatized words back into a sentence
-            return ' '.join(words_lemmatized)
-        else:
-            # If no spaCy model is available for the language, return the cleaned text
-            return ' '.join(words_cleaned)
-    else:
-        return text
-
-
-def split_clean_corpus_per_lang(corpus_path: str = 'data/corpus.json/corpus.json'):
-    """
-    This function splits and cleans a multilingual text corpus by language and saves the cleaned data into separate
-    JSON files for each language. It processes each language by filtering the text data, cleaning the sentences
-    (removing stopwords and converting to lowercase), and exporting the cleaned data into language-specific files.
-    """
-    # Load the entire corpus (~3 min with my CPU, MacPro 2016, 2,5 GHz, Intel I7)
-    print("Loading corpus... (can take up to 3 minutes)")
-    corpus = pd.read_json(corpus_path)
-    print("Corpus Loaded ! \n")
-
-    # Get the unique languages
-    langs = corpus['lang'].unique()
-
-    for lang in tqdm(langs, desc="Splitting and cleaning the corpus by languages"):
-        # Filter the DataFrame for each language
-        lang_df = corpus[corpus['lang'] == lang]
-
-        # Apply cleaning function for each row based on its language
-        lang_df['text'] = lang_df.progress_apply(lambda row: clean_sentence(row['text'], row['lang']), axis=1)
-
-        # Create a filename based on the language
-        filename = f'data/corpus.json/clean_corpus_{lang}.json'
-
-        # Save the filtered DataFrame to a JSON file
-        lang_df.to_json(filename, orient='records', lines=True)
-
-        print(f'Saved: {filename}')
+class QueryClean:
+    def __init__(self):
+        pass
