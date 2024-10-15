@@ -40,7 +40,7 @@ class CorpusClean:
     def __init__(self, corpus_path):
         # Load the entire corpus (~3 min with my CPU, MacPro 2016, 2,5 GHz, Intel I7)
         print("Loading corpus... (can take up to 3 minutes)")
-        self.corpus = pd.read_json(corpus_path).head(1000)
+        self.corpus = pd.read_json(corpus_path)
         print("Corpus Loaded ! \n")
 
         self.corpus_clean = None
@@ -103,18 +103,24 @@ class CorpusClean:
             self.nlp = SPACY_MODELS.get(lang)
 
             if self.nlp:
+                print(f"Starting lemmatizing '{lang}' docs!")
                 # Use multiprocessing to lemmatize the texts in parallel
-                with Pool(cpu_count() // 2) as pool:
-                    lemmatized_texts = pool.map(self._lemmatize, docs['text'])
+                #with Pool(cpu_count() // 3) as pool:
+                #    lemmatized_texts = pool.map(self._lemmatize, docs['text'])
+                tqdm.pandas(desc=f"Lemmatizing '{lang}' docs")
+                docs['text'] = docs.progress_apply(lambda row: self._lemmatize(row['text']), axis=1)
 
                 # Update the 'text' column with the lemmatized text
-                docs['text'] = pd.Series(lemmatized_texts)
+                #docs['text'] = pd.Series(lemmatized_texts)
 
                 # Update the corpus_clean variable
                 self.corpus_clean[lang] = docs
 
                 # Display information to the user
-                print(f"Finished lemmatizing '{lang}' docs!")
+                print(f"Finished lemmatizing '{lang}' docs!\n")
+
+            else:
+                print(f"No Lemmatizer found for '{lang}' docs!\n")
 
         # Display the words statistics of current split corpus
         return self._docs_stats_()
