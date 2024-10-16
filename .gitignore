@@ -9,3 +9,6 @@ output
 
 # Ignore all .json files
 *.json
+
+# Ignore all .pkl files
+*.pkl
