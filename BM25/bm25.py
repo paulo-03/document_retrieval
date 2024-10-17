@@ -1,12 +1,69 @@
 import math
-from collections import Counter
-
 import os
+from collections import Counter
+from pickle import dump, load, HIGHEST_PROTOCOL
 from typing import Union
 
+import numpy as np
 import pandas as pd
-from pickle import dump, load, HIGHEST_PROTOCOL
 from tqdm import tqdm
+
+
+class BM25_train:
+    def __init__(self, corpus_path: str):
+        """
+        Initializes the BM25 retriever.
+
+        Args:
+            corpus_path: Path to the corpus file.
+        """
+        corpus_df = self._load_corpus(corpus_path)
+
+        corpus_text = corpus_df['text'].tolist()
+        self.docids = corpus_df['docid'].tolist()
+        del corpus_df
+        self.corpus_size = len(corpus_text)
+        self.doc_len = []
+
+        self.avgdl = sum(len(doc) for doc in corpus_text) / self.corpus_size  # average document length
+        self.doc_freqs = []  # list of term frequency per document
+        self.idf = {}  # inverse document frequency for each term
+        self._initialize(corpus_text)
+
+    def _load_corpus(self, corpus_path):
+        """Load the cleaned corpus, meaning a transformed documents to have a constant pattern across words,
+        meaning no uppercase letter, etc."""
+        # Load the data
+        print("Loading corpus...")
+        corpus = pd.read_json(corpus_path, lines=True)
+        print("Corpus loaded successfully !\n")
+
+        # Give some basic information about the data
+        print("Information about the given corpus\n"
+              "###################################\n"
+              f"Number of documents: {len(corpus)}\n"
+              f"Language (only one language should be displayed): {corpus['lang'].unique()}\n")
+
+        return corpus
+
+    def _initialize(self, corpus_text):
+        """Precompute document frequencies and IDF for all terms in the corpus."""
+        # Compute document frequencies
+        term_doc_count = Counter()
+
+        for doc in tqdm(corpus_text, desc="Computing TFs"):
+
+            corpus_tokenized = doc.split()
+            self.doc_len.append(len(corpus_tokenized))
+            doc_term_count = Counter(corpus_tokenized)
+            self.doc_freqs.append(doc_term_count)
+            for term in doc_term_count.keys():
+                term_doc_count[term] += 1
+
+        # Compute IDF for each term
+        for term, doc_freq in tqdm(term_doc_count.items(), desc="Computing IDF"):
+            # Apply smoothing to avoid division by zero
+            self.idf[term] = math.log(self.corpus_size + 1) - math.log(doc_freq)
 
 
 class BM25:
@@ -19,39 +76,6 @@ class BM25:
             k1: Positive tuning parameter for relevance term frequency (best from 1.2 to 2.0)
             b: Positive tuning parameter for scaling the term weight by document length (best from 0 to 1.0)
         """
-
-        self.lang = None
-        self.k1 = k1
-        self.b = b
-
-        corpus_df = self._load_corpus(corpus_path)
-
-        corpus_text = corpus_df['text'].tolist()
-        self.docids = corpus_df['docid'].tolist()
-        corpus_tokenized = [doc.split() for doc in tqdm(corpus_text, desc="Tokenizing corpus")]
-        self.corpus_size = len(corpus_tokenized)
-
-        self.avgdl = sum(len(doc) for doc in corpus_tokenized) / self.corpus_size  # average document length
-        self.doc_freqs = []  # list of term frequency per document
-        self.idf = {}  # inverse document frequency for each term
-        self._initialize(corpus_tokenized)
-
-    def _load_corpus(self, corpus_path):
-        """Load the cleaned corpus, meaning a transformed documents to have a constant pattern across words,
-        meaning no uppercase letter, etc."""
-        # Load the data
-        print("Loading corpus...")
-        corpus = pd.read_json(corpus_path, lines=True)
-        self.lang = corpus['lang'].unique()[0]
-        print("Corpus loaded successfully !\n")
-
-        # Give some basic information about the data
-        print("Information about the given corpus\n"
-              "###################################\n"
-              f"Number of documents: {len(corpus)}\n"
-              f"Language (only one language should be displayed): {corpus['lang'].unique()}\n")
-
-        return corpus
 
     def _load_queries(self, query_path: str):
         """Load the cleaned data, meaning a transformed documents to have a constant pattern across words,
@@ -69,23 +93,6 @@ class BM25:
 
         return queries
 
-    def _initialize(self, corpus_tokenized):
-        """Precompute document frequencies and IDF for all terms in the corpus."""
-        # Compute document frequencies
-        doc_count = self.corpus_size
-        term_doc_count = Counter()
-
-        for doc in tqdm(corpus_tokenized, desc="Computing TFs"):
-            doc_term_count = Counter(doc)
-            self.doc_freqs.append(doc_term_count)
-            for term in doc_term_count.keys():
-                term_doc_count[term] += 1
-
-        # Compute IDF for each term
-        for term, doc_freq in tqdm(term_doc_count.items(), desc="Computing IDF"):
-            # Apply smoothing to avoid division by zero
-            self.idf[term] = math.log(1 + (doc_count - doc_freq + 0.5) / (doc_freq + 0.5))
-
     def _score(self, query, document_idx):
         """
         Computes the BM25 score for a document given a query.
@@ -93,20 +100,13 @@ class BM25:
         :param document_idx: Index of the document in the corpus
         :return: BM25 score for the document
         """
-        doc_term_count = self.doc_freqs[document_idx]
-        doc_length = sum(doc_term_count.values())
-        score = 0.0
 
-        for term in query:
-            if term not in doc_term_count:
-                continue  # term not in document, skip
-
-            term_freq = doc_term_count[term]
-            idf = self.idf.get(term, 0)  # Get IDF, 0 if term not in corpus
-            numerator = term_freq * (self.k1 + 1)
-            denominator = term_freq + self.k1 * (1 - self.b + self.b * (doc_length / self.avgdl))
-            score += idf * (numerator / denominator)
-
+        score = np.zeros(self.corpus_size)
+        doc_len = np.array(self.doc_len)
+        for q in query:
+            q_freq = np.array([(doc.get(q) or 0) for doc in self.doc_freqs])
+            score += (self.idf.get(q) or 0) * (self.delta + (q_freq * (self.k1 + 1)) /
+                                               (self.k1 * (1 - self.b + self.b * doc_len / self.avgdl) + q_freq))
         return score
 
     def _rank(self, query):
@@ -145,7 +145,6 @@ class BM25:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, 'wb') as f:
             dump(self, f, protocol=HIGHEST_PROTOCOL)
-
 
     @staticmethod
     def load_pickle(path: str):
