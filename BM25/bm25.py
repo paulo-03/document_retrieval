@@ -3,8 +3,9 @@ import os
 from collections import Counter
 from pickle import dump, load, HIGHEST_PROTOCOL
 from typing import Union
+import concurrent.futures
+from collections import Counter, defaultdict
 
-import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
@@ -17,6 +18,7 @@ class BM25_train:
         Args:
             corpus_path: Path to the corpus file.
         """
+        self.lang = None
         corpus_df = self._load_corpus(corpus_path)
 
         corpus_text = corpus_df['text'].tolist()
@@ -25,10 +27,10 @@ class BM25_train:
         self.corpus_size = len(corpus_text)
         self.doc_len = []
 
-        self.avgdl = sum(len(doc) for doc in corpus_text) / self.corpus_size  # average document length
         self.doc_freqs = []  # list of term frequency per document
         self.idf = {}  # inverse document frequency for each term
         self._initialize(corpus_text)
+        self.avgdl = sum(self.doc_len) / self.corpus_size
 
     def _load_corpus(self, corpus_path):
         """Load the cleaned corpus, meaning a transformed documents to have a constant pattern across words,
@@ -39,10 +41,11 @@ class BM25_train:
         print("Corpus loaded successfully !\n")
 
         # Give some basic information about the data
+        self.lang = corpus['lang'].unique()
         print("Information about the given corpus\n"
               "###################################\n"
               f"Number of documents: {len(corpus)}\n"
-              f"Language (only one language should be displayed): {corpus['lang'].unique()}\n")
+              f"Language (only one language should be displayed): {self.lang}\n")
 
         return corpus
 
@@ -63,19 +66,48 @@ class BM25_train:
         # Compute IDF for each term
         for term, doc_freq in tqdm(term_doc_count.items(), desc="Computing IDF"):
             # Apply smoothing to avoid division by zero
-            self.idf[term] = math.log(self.corpus_size + 1) - math.log(doc_freq)
+            self.idf[term] = math.log(1 + (self.corpus_size - doc_freq + 0.5) / (doc_freq + 0.5))
 
 
-class BM25:
-    def __init__(self, corpus_path: str, k1=1.5, b=0.75):
+    def save_pickle(self, path: str):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        results = {
+            'lang': self.lang,
+            'docids': self.docids,
+            'idf': self.idf,
+            'doc_freqs': self.doc_freqs,
+            'corpus_size': self.corpus_size,
+            'doc_len': self.doc_len,
+            'avgdl': self.avgdl
+        }
+        with open(path, 'wb') as f:
+            dump(results, f, protocol=HIGHEST_PROTOCOL)
+
+
+class BM25_retriever:
+    def __init__(self, train_path: str, k1: float = 1.5, b: float = 0.75, delta: float = 1.0):
         """
         Initializes the BM25 retriever.
 
         Args:
-            corpus_path: Path to the corpus file.
-            k1: Positive tuning parameter for relevance term frequency (best from 1.2 to 2.0)
-            b: Positive tuning parameter for scaling the term weight by document length (best from 0 to 1.0)
+            train_path: Path to the trained BM25 model.
+            k1: Hyperparameter for term frequency scaling.
+            b: Hyperparameter for length normalization.
+            delta: Hyperparameter for smoothing.
         """
+
+        self.k1 = k1
+        self.b = b
+        self.delta = delta
+        self.lang = None
+        self.docids = None
+        self.corpus_size = None
+        self.doc_len = None
+        self.avgdl = None
+        self.idf = None
+        self.doc_freqs = None
+
+        self._load_model(train_path)
 
     def _load_queries(self, query_path: str):
         """Load the cleaned data, meaning a transformed documents to have a constant pattern across words,
@@ -100,13 +132,20 @@ class BM25:
         :param document_idx: Index of the document in the corpus
         :return: BM25 score for the document
         """
+        doc_term_count = self.doc_freqs[document_idx]
+        doc_length = self.doc_len[document_idx]
+        score = 0.0
 
-        score = np.zeros(self.corpus_size)
-        doc_len = np.array(self.doc_len)
-        for q in query:
-            q_freq = np.array([(doc.get(q) or 0) for doc in self.doc_freqs])
-            score += (self.idf.get(q) or 0) * (self.delta + (q_freq * (self.k1 + 1)) /
-                                               (self.k1 * (1 - self.b + self.b * doc_len / self.avgdl) + q_freq))
+        for term in query:
+            if term not in doc_term_count:
+                continue  # term not in document, skip
+
+            term_freq = doc_term_count[term]
+            idf = self.idf.get(term, 0)  # Get IDF, 0 if term not in corpus
+            numerator = term_freq * (self.k1 + 1)
+            denominator = term_freq + self.k1 * (1 - self.b + self.b * (doc_length / self.avgdl))
+            score += idf * (numerator / denominator)
+
         return score
 
     def _rank(self, query):
@@ -141,12 +180,13 @@ class BM25:
 
         return top_10_docids
 
-    def save_pickle(self, path: str):
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, 'wb') as f:
-            dump(self, f, protocol=HIGHEST_PROTOCOL)
-
-    @staticmethod
-    def load_pickle(path: str):
-        with open(path, 'rb') as f:
-            return load(f)
+    def _load_model(self, train_path: str):
+        with open(train_path, 'rb') as f:
+            train_results = load(f)
+            self.lang = train_results['lang']
+            self.docids = train_results['docids']
+            self.idf = train_results['idf']
+            self.doc_freqs = train_results['doc_freqs']
+            self.corpus_size = train_results['corpus_size']
+            self.doc_len = train_results['doc_len']
+            self.avgdl = train_results['avgdl']
