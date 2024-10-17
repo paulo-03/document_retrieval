@@ -5,3 +5,7 @@ Author: Paulo Ribeiro
 """
 
 # TODO
+
+class LLMRetriever:
+    def __init__(self):
+        ...
