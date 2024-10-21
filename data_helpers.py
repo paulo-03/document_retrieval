@@ -5,6 +5,7 @@ Python script to help the loading of data of all kinds of datasets
 import spacy
 import pandas as pd
 import seaborn as sns
+import string
 import matplotlib.pyplot as plt
 from tqdm.notebook import tqdm
 from nltk.corpus import stopwords
@@ -87,10 +88,11 @@ class CorpusAnalysis:
 
 # Create parent class to allow data preprocessing for corpus and queries
 class TextClean:
-    def __init__(self, stat: bool = False):
+    def __init__(self, show_progress: bool = True, stat: bool = False):
         self.data = None
         self.data_clean = None
         self.nlp = None
+        self.show_progress = show_progress  # True if you want to see progress bars while pre-processing.
         self.stat = stat  # True if you want the word statistic from text after each pre-processing step.
 
     def split_per_lang(self):
@@ -113,7 +115,7 @@ class TextClean:
 
         for lang, docs in self.data_clean.items():
             # Lower case all the docs
-            tqdm.pandas(desc=f"Lower casing '{lang}' texts")
+            tqdm.pandas(desc=f"Lower casing '{lang}' texts", disable=not self.show_progress)
             docs['text'] = docs.progress_apply(lambda row: row['text'].lower(), axis=1)
 
             # Update the corpus clean variable
@@ -128,7 +130,7 @@ class TextClean:
             # Only remove stopwords for languages which we have the stop words list
             if lang_stopwords:
                 # Remove all the stop words
-                tqdm.pandas(desc=f"Removing stop words for '{lang}' texts")
+                tqdm.pandas(desc=f"Removing stop words for '{lang}' texts", disable=not self.show_progress)
                 docs['text'] = docs.progress_apply(
                     lambda row: ' '.join([word for word in row['text'].split() if word not in lang_stopwords]),
                     axis=1
@@ -152,23 +154,22 @@ class TextClean:
             self.nlp = SPACY_MODELS.get(lang)
 
             if self.nlp:
-                # Display information to the user
-                print(f"Starting lemmatizing '{lang}' texts!")
-
                 # Start Lemmatizing text
-                tqdm.pandas(desc=f"Lemmatizing '{lang}' texts")
+                tqdm.pandas(desc=f"Lemmatizing '{lang}' texts", disable=not self.show_progress)
                 docs['text'] = docs.progress_apply(lambda row: self._lemmatize(row['text']), axis=1)
                 # Update the corpus_clean variable
                 self.data_clean[lang] = docs
-
-                print(f"Finished lemmatizing '{lang}' texts!\n")
-
             else:
                 print(f"No Lemmatizer found for '{lang}' texts!\n")
 
         # Display the words statistics of current split corpus
         if self.stat:
             return self._docs_stats_()
+
+    def remove_punctuations(self):
+        """TODO"""
+        for lang, docs in tqdm(self.data_clean.items(), desc='Removing punctuation', disable=not self.show_progress):
+            docs['text'] = docs['text'].str.replace(f'[{string.punctuation}]', '', regex=True)
 
     def _docs_stats_(self):
         """TODO"""
@@ -203,8 +204,8 @@ class TextClean:
 class CorpusClean(TextClean):
     """Class to apply some methods to a corpus for pre-processing purpose"""
 
-    def __init__(self, corpus_path: str, stat: bool = False):
-        super().__init__(stat=stat)
+    def __init__(self, corpus_path: str, show_progress: bool = True, stat: bool = False):
+        super().__init__(stat=stat, show_progress=show_progress)
         # Load the entire corpus (~3 min with my CPU, MacPro 2016, 2,5 GHz, Intel I7)
         print("Loading Corpus... (can take up to 3 minutes)")
         self.data = pd.read_json(corpus_path)
@@ -235,11 +236,41 @@ class CorpusClean(TextClean):
 class QueryClean(TextClean):
     """Class to apply some methods to queries for pre-processing purpose"""
 
-    def __init__(self, queries_path):
-        super().__init__(stat=False)
+    def __init__(self, queries_path, process_steps: list[str], show_progress: bool = False):
+        super().__init__(show_progress=show_progress, stat=False)
+
+        # Check if one of the required processes are not available
+        for process_step in process_steps:
+            if process_step in ['lower_case', 'stop_words', 'lemmatization']:
+                pass
+            else:
+                raise ValueError("One of the processes given are not handle by our implementation.\n\n"
+                                 "Make sure you choose processes into this list: \n"
+                                 "['lower_case', 'stop_words', 'lemmatization']")
+
+        # If nothing to raise, we are good to go
+        self.process_steps = process_steps
+
         print("Loading queries...")
         # Rename to allow the use of class shared functions from TextClean
         self.data = pd.read_csv(queries_path).rename(columns={'query': 'text'})
-        print("Queries Loaded ! \n")
-        # Disable all tqdm progress bars globally
-        tqdm.disable = True
+        print("Done! \n")
+
+    def pre_process(self):
+        # First we split the queries per language
+        print("Starting pre-processing...\n")
+        self.split_per_lang()
+        for process_step in self.process_steps:
+            if process_step == 'lower_case':
+                print('Lower casing queries...')
+                self.lower_case()
+            elif process_step == 'stop_words':
+                print("Removing stop words...")
+                self.stop_words()
+            elif process_step == 'lemmatization':
+                print("Lemmatizing queries...")
+                self.lemmatization()
+
+        print("\nPre-processing finished !")
+
+        return list(self.data_clean.keys())

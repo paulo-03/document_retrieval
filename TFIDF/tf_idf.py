@@ -12,7 +12,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from scipy import sparse
-from multiprocessing import Pool, cpu_count
 from collections import Counter
 from pickle import dump, load, HIGHEST_PROTOCOL
 
@@ -88,7 +87,7 @@ class TFIDFVectorizer(TFIDF):
 
         # Iterating through each document to update the word count
         for text in self.data['text']:
-            word_count.update(text.split())  # self._tokenize(text))
+            word_count.update(self._tokenize(text))
 
         self.vocabulary = sorted(word_count.keys())
         self.vocab_len = len(self.vocabulary)
@@ -131,7 +130,7 @@ class TFIDFVectorizer(TFIDF):
     def _compute_idf(self, tf_matrix):
         """Compute the inverse document frequency (IDF) for the corpus."""
         N = len(self.data)
-        df = tf_matrix.astype(bool).sum(axis=0) + 1
+        df = tf_matrix.astype(bool).sum(axis=0)
         self.idf = sparse.csr_matrix(np.log((N + 1) / (df + 1)) + 1)
 
     def vectorize(self):
