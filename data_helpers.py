@@ -2,6 +2,8 @@
 Python script to help the loading of data of all kinds of datasets
 """
 
+import os
+import re
 import spacy
 import pandas as pd
 import seaborn as sns
@@ -33,7 +35,7 @@ SPACY_MODELS = {
 }
 
 
-class CorpusAnalysis:
+class RawCorpusAnalysis:
     """Class to apply some methods to a corpus for analysis purpose"""
 
     def __init__(self, corpus_path):
@@ -61,16 +63,21 @@ class CorpusAnalysis:
 
     def text_length(self):
         """Display the distribution of the length, base on the word splitting basis, of our documents."""
+        tqdm.pandas(desc="Splitting the text of each document by words")
         corpus_length = self.corpus.progress_apply(lambda row: len(row['text'].split()), axis=1)
 
         # Print some statistics
-        print(f"Some statistics about the number of words distribution over all the corpus:\n"
-              f"max: {corpus_length.max():.2f}\n"
-              f"min: {corpus_length.min():.2f}\n"
-              f"median: {corpus_length.median():.2f}\n"
-              f"95% quantile: {corpus_length.quantile(0.95):.2f}\n"
-              f"mean: {corpus_length.mean():.2f}\n"
-              f"std: {corpus_length.std():.2f}")
+        stats = {
+            "max": [corpus_length.max()],
+            "min": [corpus_length.min()],
+            "mean": [corpus_length.mean()],
+            "std": [corpus_length.std()],
+            "median": [corpus_length.median()],
+            "95th_quantile": [corpus_length.quantile(0.95)]
+        }
+
+        stat_df = pd.DataFrame.from_dict(stats)
+        stat_df.index = ['words_number']
 
         # Display the histogram distribution of words number
         plt.figure()
@@ -84,6 +91,75 @@ class CorpusAnalysis:
 
         # Display the plot
         plt.show()
+
+        return stat_df
+
+
+class CleanCorpusAnalysis:
+    """Class to apply some methods to a clean corpus for analysis purpose"""
+
+    def __init__(self, root_clean_corpus_path: str):
+        print("Loading clean corpus...")
+        self.data_clean = self._load_clean_dataset(root_clean_corpus_path)
+        print("Done.")
+
+    @staticmethod
+    def _load_clean_dataset(root_clean_corpus_path):
+        # Find all the clean dataset in the root corpus path and the pre-processing steps chosen
+        corpus_paths = ["/".join([root_clean_corpus_path, corpus])
+                        for corpus in os.listdir(root_clean_corpus_path)
+                        if corpus.endswith('.json')]
+
+        langs = [corpus_path[-7:-5] for corpus_path in corpus_paths]
+
+        return {
+            lang: pd.read_json(corpus_path, lines=True)
+            for lang, corpus_path in zip(langs, corpus_paths)
+        }
+
+    def docs_stats(self):
+        """TODO"""
+        # Compute some statistics for the split documents
+        split_stats = {
+            "lang": [],
+            "num_docs": [],
+            "max_words": [],
+            "min_words": [],
+            "mean_words": [],
+            "median_words": [],
+            "95th_quantile_words": []
+        }
+        for lang, docs in self.data_clean.items():
+            # Compute the number of words per documents in a specific languages
+            docs_length = docs.apply(lambda row: len(row['text'].split()), axis=1)
+
+            # Update the dict
+            split_stats['lang'].append(lang)
+            split_stats['num_docs'].append(len(docs))
+            split_stats['max_words'].append(docs_length.max())
+            split_stats['min_words'].append(docs_length.min())
+            split_stats['mean_words'].append(docs_length.mean())
+            split_stats['median_words'].append(docs_length.median())
+            split_stats['95th_quantile_words'].append(docs_length.quantile(0.95))
+
+        # Display the stats
+        return pd.DataFrame.from_dict(split_stats)
+
+    def show_docs(self):
+        """TODO"""
+        print(f"{'-' * 50}\n"
+              "Current state of documents (first 300 characters):\n"
+              f"{'-' * 50}\n")
+
+        for lang, docs in self.data_clean.items():
+            doc = docs.iloc[0]
+            docid = doc['docid']
+            text = re.sub(r'\n+', ' ', doc['text'][:300])
+
+            print(f"Language: {lang}\n"
+                  f"Docid: {docid}\n"
+                  f"{'-' * 50}\n"
+                  f"Text: \n{text}\n")
 
 
 # Create parent class to allow data preprocessing for corpus and queries
@@ -170,35 +246,8 @@ class TextClean:
         """TODO"""
         for lang, docs in tqdm(self.data_clean.items(), desc='Removing punctuation', disable=not self.show_progress):
             docs['text'] = docs['text'].str.replace(f'[{string.punctuation}]', '', regex=True)
-
-    def _docs_stats_(self):
-        """TODO"""
-        # Compute some statistics for the split documents
-        split_stats = {
-            "lang": [],
-            "num_docs": [],
-            "max_words": [],
-            "min_words": [],
-            "mean_words": [],
-            "median_words": [],
-            "95th_quantile_words": []
-        }
-        for lang, docs in self.data_clean.items():
-            # Compute the number of words per documents in a specific languages
-            tqdm.pandas(desc=f"Stats for '{lang}' docs")
-            docs_length = docs.progress_apply(lambda row: len(row['text'].split()), axis=1)
-
-            # Update the dict
-            split_stats['lang'].append(lang)
-            split_stats['num_docs'].append(len(docs))
-            split_stats['max_words'].append(docs_length.max())
-            split_stats['min_words'].append(docs_length.min())
-            split_stats['mean_words'].append(docs_length.mean())
-            split_stats['median_words'].append(docs_length.median())
-            split_stats['95th_quantile_words'].append(docs_length.quantile(0.95))
-
-        # Display the stats
-        return pd.DataFrame.from_dict(split_stats)
+            # Update the corpus clean variable
+            self.data_clean[lang] = docs
 
 
 class CorpusClean(TextClean):
@@ -210,22 +259,6 @@ class CorpusClean(TextClean):
         print("Loading Corpus... (can take up to 3 minutes)")
         self.data = pd.read_json(corpus_path)
         print("Data Loaded ! \n")
-
-    def show_current_docs(self):
-        """TODO"""
-        print(f"{'-' * 50}\n"
-              "Current state of documents (first 300 characters):\n"
-              f"{'-' * 50}\n")
-
-        for lang, docs in self.data_clean.items():
-            doc = docs.iloc[0]
-            docid = doc['docid']
-            text = doc['text']
-
-            print(f"Language: {lang}\n"
-                  f"Docid: {docid}\n"
-                  f"{'-' * 50}\n"
-                  f"Text:\n{text[:300]}\n")
 
     def store(self, path: str):
         """TODO"""
@@ -260,6 +293,7 @@ class QueryClean(TextClean):
         # First we split the queries per language
         print("Starting pre-processing...\n")
         self.split_per_lang()
+        self.remove_punctuations()
         for process_step in self.process_steps:
             if process_step == 'lower_case':
                 print('Lower casing queries...')

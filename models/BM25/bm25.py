@@ -95,17 +95,17 @@ class BM25sTrainer:
         """Compute the inverse document frequency (IDF) for the corpus."""
         N = len(self.data)
         df = self.norm_tf_matrix.astype(bool).sum(axis=0)
-        print("Inverse Document Frequency (IDF) computed!\n")
         return sparse.csr_matrix(np.log((N + 1) / (df + 1)) + 1)
 
     def fit(self):
         """Fit the BM25S model to the corpus by computing necessary statistics."""
+        print(f"Initiate BM25s model training for '{self.lang}' documents.")
         self.norm_tf_matrix = self._compute_norm_tf()
         print("Computing IDF...")
         self.idf = self._compute_idf()
         print("Computing score matrix (IDF x normalized TF)...")
         self.score_matrix = sparse.csr_matrix(self.norm_tf_matrix.multiply(self.idf))
-        print(f"BM25S Trainer is ready for {self.lang} document retrieval!")
+        print(f"BM25s model is ready for {self.lang} document retrieval!")
 
     def save_results(self, path: str):
         """Save the computed data to a file for future use."""
@@ -120,9 +120,9 @@ class BM25sTrainer:
             'b': self.b
         }
 
-        with open(f'{path}/bm25s_{self.lang}.pkl', 'wb') as f:
+        with open(f'{path}/bm25s_{self.lang}_{self.k1}.pkl', 'wb') as f:
             dump(results, f, protocol=HIGHEST_PROTOCOL)
-        print("BM25S model saved successfully!")
+        print(f"BM25s model for '{self.lang}' saved successfully! (k1: {self.k1}, b: {self.b})")
 
 
 class BM25sRetriever:
@@ -156,7 +156,7 @@ class BM25sRetriever:
                          f"Please make sure to use the right model for your current queries.")
             raise ValueError(error_msg)
         else:
-            print(f"BM25s retriever ready to go ! (k1: {k1}, b: {b})\n")
+            print(f"BM25s retriever for '{model_lang}' queries ready to go ! (k1: {k1}, b: {b})\n")
 
     def _compute_tf(self):
         """Compute term frequency (TF) matrix for the queries."""
@@ -194,8 +194,8 @@ class BM25sRetriever:
         # Convert query TF matrix rows to a list of sparse matrix rows
         queries_tf = [self.query_tf_matrix.getrow(i) for i in range(self.query_tf_matrix.shape[0])]
 
-        print(f"Computing BM25S scores with multiprocessing for {self.lang} queries...")
-        with Pool(processes=int(cpu_count()/2)) as pool:
+        print(f"Computing BM25S scores with multiprocessing for '{self.lang}' queries...")
+        with Pool(processes=int(cpu_count())) as pool:
             # Pass the list of sparse rows to the pool and compute top-k results for each query
             top_k_docs = pool.map(self._score_single_query, queries_tf)
 
