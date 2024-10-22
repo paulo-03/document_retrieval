@@ -9,7 +9,7 @@ import pandas as pd
 import seaborn as sns
 import string
 import matplotlib.pyplot as plt
-from tqdm.notebook import tqdm
+from tqdm import tqdm
 from nltk.corpus import stopwords
 
 # Pre-define stopwords for each language (you can keep your STOPWORDS_DICT)
@@ -164,12 +164,11 @@ class CleanCorpusAnalysis:
 
 # Create parent class to allow data preprocessing for corpus and queries
 class TextClean:
-    def __init__(self, show_progress: bool = True, stat: bool = False):
+    def __init__(self, show_progress: bool = True):
         self.data = None
         self.data_clean = None
         self.nlp = None
         self.show_progress = show_progress  # True if you want to see progress bars while pre-processing.
-        self.stat = stat  # True if you want the word statistic from text after each pre-processing step.
 
     def split_per_lang(self):
         """TODO"""
@@ -182,9 +181,107 @@ class TextClean:
             for lang in langs
         }
 
-        # Display the words statistics of current split corpus
-        if self.stat:
-            return self._docs_stats_()
+    @staticmethod
+    def _simple_tokenizer(text):
+        """Use regex to find words and punctuation if no SpaCY model is available."""
+        tokens = re.findall(r'\b\w+\b|[^\w\s]', text)
+        return tokens
+
+    def lc(self):
+        """TODO"""
+        for lang, docs in self.data_clean.items():
+
+            # Select the correct SpaCY model
+            nlp = SPACY_MODELS.get(lang)
+
+            # Initiate the tqdm progress bar if show_progress to True
+            tqdm.pandas(desc=f"LC for '{lang}' texts", disable=not self.show_progress)
+
+            if nlp:
+                tokenizer = nlp.tokenizer
+
+                # Lower case all the docs and removes punctuation with spacy
+                docs['text'] = docs.progress_apply(
+                    lambda row: " ".join(token.text
+                                         for token in tokenizer(row['text'].lower())
+                                         if not token.is_punct),
+                    axis=1)
+
+            else:
+                # Take the simple tokenizer since no SpaCY model is founded
+                tokenizer = self._simple_tokenizer
+
+                # Lower case all the docs and removes punctuation with spacy
+                docs['text'] = docs.progress_apply(
+                    lambda row: " ".join(token
+                                         for token in tokenizer(row['text'].lower())
+                                         if token.isalnum()),
+                    axis=1)
+
+
+
+    def lc_sw(self):
+        """TODO"""
+        for lang, docs in self.data_clean.items():
+
+            # Select the correct SpaCY model
+            nlp = SPACY_MODELS.get(lang)
+
+            # Initiate the tqdm progress bar if show_progress to True
+            tqdm.pandas(desc=f"LC and SW for '{lang}' texts", disable=not self.show_progress)
+
+            if nlp:
+
+                # Retrieve the tokenizer from SpaCY model
+                tokenizer = nlp.tokenizer
+
+                # Lower case all the docs and removes punctuation with spacy
+                docs['text'] = docs.progress_apply(
+                    lambda row: " ".join(token.text
+                                         for token in tokenizer(row['text'].lower())
+                                         if not token.is_punct and not token.is_stop),
+                    axis=1)
+
+            else:
+                # Check if stopwords exist in NLTK
+                lang_stopwords = STOPWORDS_DICT.get(lang)
+
+                # Take the simple tokenizer since no SpaCY model is founded
+                tokenizer = self._simple_tokenizer
+
+                if lang_stopwords:
+                    # Lower case all the docs and removes punctuation with SpaCY and stopwords with NLTK
+                    docs['text'] = docs.progress_apply(
+                        lambda row: " ".join(token
+                                             for token in tokenizer(row['text'].lower())
+                                             if token.isalnum() and token not in lang_stopwords),
+                        axis=1)
+
+                else:
+                    # Will be the same file from lc, so just drag it to the folder
+                    pass
+
+    def lc_sw_l(self):
+        """TODO"""
+        for lang, docs in self.data_clean.items():
+
+            # Select the correct SpaCY model
+            nlp = SPACY_MODELS.get(lang)
+
+            # Initiate the tqdm progress bar if show_progress to True
+            tqdm.pandas(desc=f"LC, SW and L for '{lang}' texts", disable=not self.show_progress)
+
+            if nlp:
+                # Lower case all the docs and removes punctuation with spacy
+                docs['text'] = docs.progress_apply(
+                    lambda row: ' '.join(token.lemma_.lower()
+                                         for token in nlp(row['text'])
+                                         if not token.is_punct and not token.is_stop),
+                    axis=1)
+
+            else:
+                # Will be the same file from lc_sw, so just drag it to the folder
+                pass
 
     def lower_case(self):
         """TODO"""
@@ -215,10 +312,6 @@ class TextClean:
                 # Update the corpus clean variable
                 self.data_clean[lang] = docs
 
-        # Display the words statistics of current split corpus
-        if self.stat:
-            return self._docs_stats_()
-
     def _lemmatize(self, text):
         """Function to lemmatize a single chunk of texts"""
         return ' '.join([token.lemma_ for token in self.nlp(text)])
@@ -238,10 +331,6 @@ class TextClean:
             else:
                 print(f"No Lemmatizer found for '{lang}' texts!\n")
 
-        # Display the words statistics of current split corpus
-        if self.stat:
-            return self._docs_stats_()
-
     def remove_punctuations(self):
         """TODO"""
         for lang, docs in tqdm(self.data_clean.items(), desc='Removing punctuation', disable=not self.show_progress):
@@ -254,7 +343,7 @@ class CorpusClean(TextClean):
     """Class to apply some methods to a corpus for pre-processing purpose"""
 
     def __init__(self, corpus_path: str, show_progress: bool = True, stat: bool = False):
-        super().__init__(stat=stat, show_progress=show_progress)
+        super().__init__(show_progress=show_progress)
         # Load the entire corpus (~3 min with my CPU, MacPro 2016, 2,5 GHz, Intel I7)
         print("Loading Corpus... (can take up to 3 minutes)")
         self.data = pd.read_json(corpus_path)
@@ -262,6 +351,9 @@ class CorpusClean(TextClean):
 
     def store(self, path: str):
         """TODO"""
+        # Ensure the folder exists or create it if it doesn't
+        os.makedirs(path, exist_ok=True)
+
         for lang, docs in tqdm(self.data_clean.items(), desc="Storing current clean dataset into disk"):
             docs.to_json(f'{path}/clean_corpus_{lang}.json', orient='records', lines=True)
 
@@ -270,7 +362,7 @@ class QueryClean(TextClean):
     """Class to apply some methods to queries for pre-processing purpose"""
 
     def __init__(self, queries_path, process_steps: list[str], show_progress: bool = False):
-        super().__init__(show_progress=show_progress, stat=False)
+        super().__init__(show_progress=show_progress)
 
         # Check if one of the required processes are not available
         for process_step in process_steps:
