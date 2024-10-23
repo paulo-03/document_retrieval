@@ -4,7 +4,7 @@ Author: Paulo Ribeiro
 """
 
 import os
-from models.BM25.bm25 import BM25sTrainer
+from bm25s import BM25sTrainer
 
 
 def main(root_corpus_path: str, k1: float, b: float):
@@ -36,6 +36,6 @@ def main(root_corpus_path: str, k1: float, b: float):
 
 
 if __name__ == '__main__':
-    main(root_corpus_path="../../clean_data/lower_case",
+    main(root_corpus_path="../../clean_data/lc",
          k1=1.2,  # values going from [1.2, 2]
          b=0.75)

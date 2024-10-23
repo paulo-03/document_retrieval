@@ -42,7 +42,7 @@ def main(processing_wanted: str):
 
 if __name__ == '__main__':
 
-    for processing_wanted in ['lc', 'lc_sw', 'lc_sw_l']:
+    for process in ['lc', 'lc_sw', 'lc_sw_l']:
         main(
-            processing_wanted='lc'
+            processing_wanted=process
         )

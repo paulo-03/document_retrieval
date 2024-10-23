@@ -148,13 +148,13 @@ class CleanCorpusAnalysis:
     def show_docs(self):
         """TODO"""
         print(f"{'-' * 50}\n"
-              "Current state of documents (first 300 characters):\n"
+              "Current state of documents (first 500 characters):\n"
               f"{'-' * 50}\n")
 
         for lang, docs in self.data_clean.items():
             doc = docs.iloc[0]
             docid = doc['docid']
-            text = re.sub(r'\n+', ' ', doc['text'][:300])
+            text = re.sub(r'\n+', ' ', doc['text'][:500])
 
             print(f"Language: {lang}\n"
                   f"Docid: {docid}\n"
@@ -283,61 +283,6 @@ class TextClean:
                 # Will be the same file from lc_sw, so just drag it to the folder
                 pass
 
-    def lower_case(self):
-        """TODO"""
-
-        for lang, docs in self.data_clean.items():
-            # Lower case all the docs
-            tqdm.pandas(desc=f"Lower casing '{lang}' texts", disable=not self.show_progress)
-            docs['text'] = docs.progress_apply(lambda row: row['text'].lower(), axis=1)
-
-            # Update the corpus clean variable
-            self.data_clean[lang] = docs
-
-    def stop_words(self):
-        """TODO"""
-        for lang, docs in self.data_clean.items():
-            # Get stopwords for the language
-            lang_stopwords = STOPWORDS_DICT.get(lang)
-
-            # Only remove stopwords for languages which we have the stop words list
-            if lang_stopwords:
-                # Remove all the stop words
-                tqdm.pandas(desc=f"Removing stop words for '{lang}' texts", disable=not self.show_progress)
-                docs['text'] = docs.progress_apply(
-                    lambda row: ' '.join([word for word in row['text'].split() if word not in lang_stopwords]),
-                    axis=1
-                )
-
-                # Update the corpus clean variable
-                self.data_clean[lang] = docs
-
-    def _lemmatize(self, text):
-        """Function to lemmatize a single chunk of texts"""
-        return ' '.join([token.lemma_ for token in self.nlp(text)])
-
-    def lemmatization(self):
-        """Efficiently lemmatize the documents in the corpus."""
-        for lang, docs in self.data_clean.items():
-            # Get the appropriate spaCy model for the language
-            self.nlp = SPACY_MODELS.get(lang)
-
-            if self.nlp:
-                # Start Lemmatizing text
-                tqdm.pandas(desc=f"Lemmatizing '{lang}' texts", disable=not self.show_progress)
-                docs['text'] = docs.progress_apply(lambda row: self._lemmatize(row['text']), axis=1)
-                # Update the corpus_clean variable
-                self.data_clean[lang] = docs
-            else:
-                print(f"No Lemmatizer found for '{lang}' texts!\n")
-
-    def remove_punctuations(self):
-        """TODO"""
-        for lang, docs in tqdm(self.data_clean.items(), desc='Removing punctuation', disable=not self.show_progress):
-            docs['text'] = docs['text'].str.replace(f'[{string.punctuation}]', '', regex=True)
-            # Update the corpus clean variable
-            self.data_clean[lang] = docs
-
 
 class CorpusClean(TextClean):
     """Class to apply some methods to a corpus for pre-processing purpose"""
@@ -361,20 +306,19 @@ class CorpusClean(TextClean):
 class QueryClean(TextClean):
     """Class to apply some methods to queries for pre-processing purpose"""
 
-    def __init__(self, queries_path, process_steps: list[str], show_progress: bool = False):
+    def __init__(self, queries_path, processing_wanted: str, show_progress: bool = False):
         super().__init__(show_progress=show_progress)
 
-        # Check if one of the required processes are not available
-        for process_step in process_steps:
-            if process_step in ['lower_case', 'stop_words', 'lemmatization']:
-                pass
-            else:
-                raise ValueError("One of the processes given are not handle by our implementation.\n\n"
-                                 "Make sure you choose processes into this list: \n"
-                                 "['lower_case', 'stop_words', 'lemmatization']")
+        # Check if the required processes is available
+        if processing_wanted in ['lc', 'lc_sw', 'lc_sw_l']:
+            pass
+        else:
+            raise ValueError("One of the processes given are not handle by our implementation.\n\n"
+                             "Make sure you choose processes into this list: \n"
+                             "['lower_case', 'stop_words', 'lemmatization']")
 
         # If nothing to raise, we are good to go
-        self.process_steps = process_steps
+        self.process = processing_wanted
 
         print("Loading queries...")
         # Rename to allow the use of class shared functions from TextClean
@@ -383,19 +327,19 @@ class QueryClean(TextClean):
 
     def pre_process(self):
         # First we split the queries per language
-        print("Starting pre-processing...\n")
+        print("Starting pre-processing queries...\n")
+
+        # For any processing choice, the first step is to split the documents per languages
         self.split_per_lang()
-        self.remove_punctuations()
-        for process_step in self.process_steps:
-            if process_step == 'lower_case':
-                print('Lower casing queries...')
-                self.lower_case()
-            elif process_step == 'stop_words':
-                print("Removing stop words...")
-                self.stop_words()
-            elif process_step == 'lemmatization':
-                print("Lemmatizing queries...")
-                self.lemmatization()
+
+        if self.process == 'lc':
+            self.lc()
+
+        elif self.process == 'lc_sw':
+            self.lc_sw()
+
+        elif self.process == 'lc_sw_l':
+            self.lc_sw_l()
 
         print("\nPre-processing finished !")
 

@@ -1,5 +1,5 @@
 """
-This python script implement the class used to use the BM25 method, inspired by TF-IDF
+This python script implement the class used to use the BM25s method, inspired by TF-IDF
 to retrieve documents from a query.
 
 Author: Paulo Ribeiro
@@ -42,7 +42,7 @@ class BM25sTrainer:
         lang = corpus['lang'].unique()
         if len(lang) == 1:
             self.lang = lang[0]
-            print(f"Corpus loaded successfully! Found {len(corpus)} documents in '{self.lang}'.")
+            print(f"Corpus loaded successfully! Found {len(corpus)} documents in '{self.lang}'.\n")
             return corpus
         else:
             raise Warning(f"The corpus you are giving is multilingual ({len(lang)} different languages)."
@@ -53,6 +53,7 @@ class BM25sTrainer:
         word_count = Counter()
         doc_length = []
 
+        print("Starting computing corpus vocabulary...")
         for doc in self.data['text']:
             tokens = tokenize(doc)
             word_count.update(tokens)
@@ -80,7 +81,7 @@ class BM25sTrainer:
 
             for token, freq in token_freq.items():
                 if token in token_to_id:
-                    # Compute the normalized TF from BM25 score
+                    # Compute the normalized TF from BM25s score
                     nominator = freq * (self.k1 + 1)
                     denominator = freq + self.k1 * (1 - self.b + self.b * doc_length / self.avgdl)
                     value = nominator / denominator
@@ -105,11 +106,11 @@ class BM25sTrainer:
         self.idf = self._compute_idf()
         print("Computing score matrix (IDF x normalized TF)...")
         self.score_matrix = sparse.csr_matrix(self.norm_tf_matrix.multiply(self.idf))
-        print(f"BM25s model is ready for {self.lang} document retrieval!")
+        print(f"BM25s model is ready for {self.lang} document retrieval!\n")
 
     def save_results(self, path: str):
         """Save the computed data to a file for future use."""
-        os.makedirs(f'{path}', exist_ok=True)
+        os.makedirs(f'{path}/k1_{self.k1}', exist_ok=True)
         results = {
             'vocabulary': self.vocabulary,
             'vocab_len': self.vocab_len,
@@ -120,9 +121,9 @@ class BM25sTrainer:
             'b': self.b
         }
 
-        with open(f'{path}/bm25s_{self.lang}_{self.k1}.pkl', 'wb') as f:
+        with open(f'{path}/k1_{self.k1}/bm25s_{self.lang}.pkl', 'wb') as f:
             dump(results, f, protocol=HIGHEST_PROTOCOL)
-        print(f"BM25s model for '{self.lang}' saved successfully! (k1: {self.k1}, b: {self.b})")
+        print(f"BM25s model for '{self.lang}' saved successfully! (k1: {self.k1}, b: {self.b})\n\n")
 
 
 class BM25sRetriever:
