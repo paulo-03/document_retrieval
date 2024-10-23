@@ -327,7 +327,7 @@ class QueryClean(TextClean):
 
     def pre_process(self):
         # First we split the queries per language
-        print("Starting pre-processing queries...\n")
+        print("Starting pre-processing queries...")
 
         # For any processing choice, the first step is to split the documents per languages
         self.split_per_lang()
@@ -341,6 +341,6 @@ class QueryClean(TextClean):
         elif self.process == 'lc_sw_l':
             self.lc_sw_l()
 
-        print("\nPre-processing finished !")
+        print("Pre-processing finished !\n")
 
         return list(self.data_clean.keys())
