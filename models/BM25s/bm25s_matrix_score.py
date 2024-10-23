@@ -38,8 +38,8 @@ def main(root_corpus_path: str, k1: float, b: float):
 
 if __name__ == '__main__':
 
-    k1s = [1.2, 1.6, 2.0]
-    processes = ['lc_sw', 'lc_sw_l']
+    k1s = [1.0]  # [1.2, 1.6, 2.0]
+    processes = ['lc', 'lc_sw', 'lc_sw_l']
 
     for process in processes:
         for k1 in k1s:

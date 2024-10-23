@@ -77,14 +77,14 @@ def main(model: str, processing_wanted: str, data_type: str, k1: float):
 
 
 if __name__ == '__main__':
-    processes = ['lc']  #['lc', 'lc_sw', 'lc_sw_l']
-    k1s = [1.6]  #[1.2, 1.6, 2.0]
+    processes = ['lc', 'lc_sw', 'lc_sw_l']
+    k1s = [1.0]  #[1.2, 1.6, 2.0]
 
     for process in processes:
         for k1 in k1s:
             main(
                 processing_wanted=process,  # 'lc', 'lc_sw' or 'lc_sw_l'
                 model='BM25s',  # 'BM25s' or 'TFIDF'
-                data_type='test',  # 'dev' or 'test'
+                data_type='dev',  # 'dev' or 'test'
                 k1=k1  # Only useful for BM25s model
             )

@@ -97,6 +97,7 @@ def k1_comparison(file_path: str = 'aggregate_solutions.csv'):
     plt.show()
 
 
+
 def lang_comparison(file_path: str = 'aggregate_solutions.csv'):
     """Generate bar plots comparing language performance across processes."""
 
@@ -130,6 +131,9 @@ def lang_comparison(file_path: str = 'aggregate_solutions.csv'):
 
         # Add grid lines below the bars
         axes[i].grid(visible=True, linestyle='--', linewidth=0.7, alpha=0.7)
+
+        # Set Y-axis limits to be between 0.6 and 1.0
+        axes[i].set_ylim(0.6, 1.0)
 
     # Adjust the layout to prevent overlap
     plt.tight_layout()
