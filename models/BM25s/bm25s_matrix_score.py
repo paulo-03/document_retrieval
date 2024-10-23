@@ -36,6 +36,12 @@ def main(root_corpus_path: str, k1: float, b: float):
 
 
 if __name__ == '__main__':
-    main(root_corpus_path="../../clean_data/lc",
-         k1=1.2,  # values going from [1.2, 2]
-         b=0.75)
+
+    k1s = [1.2, 1.6, 2.0]
+    processes = ['lc_sw', 'lc_sw_l']
+
+    for process in processes:
+        for k1 in k1s:
+            main(root_corpus_path=f"../../clean_data/{process}",
+                 k1=k1,  # values going from [1.2, 2]
+                 b=0.75)
