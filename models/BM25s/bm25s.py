@@ -202,7 +202,7 @@ class BM25sRetriever:
 
         # Save matches as a pandas Series
         self.matches = pd.Series(top_k_docs, name='docids')
-        print(f"Retrieved top-{self.top_k} documents for each {self.lang} query.")
+        print(f"Retrieved top-{self.top_k} documents for each '{self.lang}' query.")
 
     def show_results(self):
         """Display results."""

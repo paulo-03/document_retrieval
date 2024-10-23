@@ -17,6 +17,7 @@ def main(root_corpus_path: str, k1: float, b: float):
     # Isolate the pre-processing steps chosen, to store the model in the right place
     pre_process = root_corpus_path.split('/')[-1]
 
+    # Start "training" model for the specific pre-process corpus of each language
     for corpus_path in corpus_paths:
         # Initiate the model
         bm25s = BM25sTrainer(
