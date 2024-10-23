@@ -182,9 +182,9 @@ class BM25sRetriever:
 
         return sparse.csr_matrix((tf_values, (query_ids, token_ids)), shape=(queries_number, self.vocab_len))
 
-    def _score_single_query(self, query_tf):
+    def _score_single_query(self, query_doc_scores):
         """Compute BM25S score for a single query against all documents and select the top k docs."""
-        query_bm25_scores = np.asarray(query_tf.multiply(self.score_matrix).sum(axis=1)).flatten()
+        query_bm25_scores = query_doc_scores.toarray().flatten()
         return [self.id_to_docid[idx] for idx in np.argsort(query_bm25_scores)[-self.top_k:][::-1]]
 
     def match(self):
@@ -192,13 +192,16 @@ class BM25sRetriever:
         # Start by computing the queries TF to know the occurrence of each word in the query to compute the score.
         self.query_tf_matrix = self._compute_tf()
 
+        # Compute the query x doc score matrix
+        queries_docs_scores = self.query_tf_matrix.dot(self.score_matrix.T)
+
         # Convert query TF matrix rows to a list of sparse matrix rows
-        queries_tf = [self.query_tf_matrix.getrow(i) for i in range(self.query_tf_matrix.shape[0])]
+        queries_docs_scores = [queries_docs_scores.getrow(i) for i in range(queries_docs_scores.shape[0])]
 
         print(f"Computing BM25S scores with multiprocessing for '{self.lang}' queries...")
-        with Pool(processes=int(cpu_count())) as pool:
+        with Pool(processes=int(4)) as pool:
             # Pass the list of sparse rows to the pool and compute top-k results for each query
-            top_k_docs = pool.map(self._score_single_query, queries_tf)
+            top_k_docs = pool.map(self._score_single_query, queries_docs_scores)
 
         # Save matches as a pandas Series
         self.matches = pd.Series(top_k_docs, name='docids')
