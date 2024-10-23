@@ -66,7 +66,7 @@ class BM25_train:
         # Compute IDF for each term
         for term, doc_freq in tqdm(term_doc_count.items(), desc="Computing IDF"):
             # Apply smoothing to avoid division by zero
-            self.idf[term] = math.log(1 + (self.corpus_size - doc_freq + 0.5) / (doc_freq + 0.5))
+            self.idf[term] = math.log(self.corpus_size + 1) - math.log(doc_freq)
 
 
     def save_pickle(self, path: str):
@@ -85,7 +85,7 @@ class BM25_train:
 
 
 class BM25_retriever:
-    def __init__(self, train_path: str, k1: float = 1.5, b: float = 0.75, delta: float = 1.0):
+    def     __init__(self, train_path: str, k1: float = 1.5, b: float = 0.75, delta: float = 1.0):
         """
         Initializes the BM25 retriever.
 
@@ -142,8 +142,8 @@ class BM25_retriever:
 
             term_freq = doc_term_count[term]
             idf = self.idf.get(term, 0)  # Get IDF, 0 if term not in corpus
-            numerator = term_freq * (self.k1 + 1)
-            denominator = term_freq + self.k1 * (1 - self.b + self.b * (doc_length / self.avgdl))
+            numerator = term_freq + self.delta * term_freq
+            denominator = term_freq + self.delta + self.k1 * (1 - self.b + self.b * (doc_length / self.avgdl))
             score += idf * (numerator / denominator)
 
         return score

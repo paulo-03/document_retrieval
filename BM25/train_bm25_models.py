@@ -2,8 +2,8 @@
 
 from bm25 import BM25_train
 
-# langs = ['fr', 'es', 'de', 'it', 'ar', 'ko']
-langs = ['en']
+langs = ['fr', 'es', 'de', 'it', 'ar', 'ko']
+# langs = ['en']
 for lang in langs:
     print(f"Initializing BM25 model for {lang}...")
     path = f"../clean_data/lower_case_stop_words_lemmatization/clean_corpus_{lang}.json"
