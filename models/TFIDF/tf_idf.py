@@ -31,7 +31,7 @@ class TFIDF:
         return re.findall(r'\b\w+\b', doc)
 
     def _compute_tf(self):
-        """TODO"""
+        """Compute the Term Frequency matrix"""
         # Prepare lists to construct a sparse matrix
         doc_ids = []
         token_ids = []
@@ -139,16 +139,14 @@ class TFIDFVectorizer(TFIDF):
         corpus_tf_matrix = self._compute_tf()
 
         # Computation of the IDF vector
-        print("\nComputing IDF...")
+        print("Computing IDF...")
         self._compute_idf(tf_matrix=corpus_tf_matrix)
-        print("Done.\n")
 
         # Multiply the TF vectors by the IDF vector
         print("Computing TF-IDF matrix...")
         self.tf_idf_matrix = self._compute_tf_idf(tf_matrix=corpus_tf_matrix)
-        print("Done.\n")
 
-        print(f"The TF-IDF matrix has a shape of {self.tf_idf_matrix.shape}.")
+        print(f"The TF-IDF matrix is ready and has a shape of {self.tf_idf_matrix.shape}.")
 
     def save_results(self, path: str):
         """Save the TF-IDF matrix and related data."""
@@ -166,7 +164,7 @@ class TFIDFVectorizer(TFIDF):
         # Save the results using pickle with compression
         with open(f'{path}/tf_idf_{self.lang}.pkl', 'wb') as f:
             dump(results, f, protocol=HIGHEST_PROTOCOL)
-        print("TF-IDF results saved successfully using pickle!")
+        print("TF-IDF results saved successfully using pickle!\n")
 
 
 class TFIDFRetriever(TFIDF):
@@ -193,8 +191,18 @@ class TFIDFRetriever(TFIDF):
         if lang != self.lang:
             raise Warning(f"You are trying to use TFIDFRetriever for '{lang}' queries, using '{self.lang}' documents.")
 
+        if self.lang != self.data['lang'].unique()[0]:
+            error_msg = (f"Model language ({self.lang}) and queries language ({self.data['lang'].unique()[0]}) "
+                         f"are not equivalent. Please make sure to use the right model for your current queries.")
+            raise ValueError(error_msg)
+        else:
+            print(f"TFIDF retriever for '{self.lang}' queries ready to go !\n")
+
+
+
     def vectorize_query(self):
         """Vectorize the queries by computing its TF-IDF vector"""
+        print(f"Vectorization of '{self.lang}' queries...")
         # Computation of the sparse TF matrix
         query_tf_matrix = self._compute_tf()
 
@@ -218,17 +226,22 @@ class TFIDFRetriever(TFIDF):
         return normalized_matrix
 
     def match(self):
-        """TODO"""
+        """Perform the matching between queries and documents."""
+        print("Start matching process of queries and documents:\n"
+              "Normalization of all sparse vector representation of documents and queries...")
         # First, we need to normalize both matrices
         normalized_queries = self.normalize_sparse_matrix(self.query_tf_idf_matrix)
         normalized_documents = self.normalize_sparse_matrix(self.tf_idf_matrix)
 
+        print("Computing cosine similarity between query and documents vectors...")
         # Now, we can simply compute the dot product to retrieve the cosine similarity
         cosine_sim_matrix = normalized_queries.dot(normalized_documents.T)
 
         # Step 3: For each query, get the indices of the top-k highest similarities (document ids)
         top_docids_to_query = []
-        for similarity in cosine_sim_matrix:  # Iterate over each query
+        for similarity in tqdm(cosine_sim_matrix, total=cosine_sim_matrix.shape[0],
+                               desc=f"Finding the {self.top_k} documents for each queries",
+                               unit='query'):  # Iterate over each query
             # Get the top-k document indices for this query
             top_k_ids = np.argsort(np.abs(similarity.toarray().flatten()))[-self.top_k:][::-1]
             top_k_docids = [self.id_to_docid[ids] for ids in top_k_ids]
@@ -236,3 +249,4 @@ class TFIDFRetriever(TFIDF):
 
         # Add the results to the query DataFrame
         self.matches = pd.Series(top_docids_to_query, name='docids')
+        print("Done!\n")
