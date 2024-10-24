@@ -168,7 +168,7 @@ class BM25_retriever:
         else:
             query_df = query_source
 
-        queries = query_df['query'].tolist()
+        queries = query_df['text'].tolist()
         queries_ids = query_df['query_id'].tolist()
 
         top_10_docids = {}

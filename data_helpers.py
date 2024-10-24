@@ -7,7 +7,6 @@ import re
 import spacy
 import pandas as pd
 import seaborn as sns
-import string
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from nltk.corpus import stopwords
