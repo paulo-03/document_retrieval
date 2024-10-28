@@ -30,7 +30,7 @@ The repository is structured and evolves as follows:
    removal, lowercase + stopwords removal + lemmatization) and save the 3 cleaned corpus in [clean_data](./clean_data/).
    We verify and analyze the new versions of the corpus in [*corpus_analysis.ipynb*](./corpus_analysis.ipynb).
 3. Using our models implementation (either [*bm25s_matrix_score.py*](./models/BM25s/bm25s_matrix_score.py) or [
-   *tf_idf_vectorize.py*](./models/TFIDF/tf_idf_vectorize.py)), we *~encode~* the preprocessed versions of the corpus
+   *tf_idf_vectorize.py*](./models/TFIDF/tf_idf_vectorize.py)), we *~encode* the preprocessed versions of the corpus
    into vectors and save the resulting matrices (in [models/BM25s/bm25s_matrix](./models/BM25s/bm25s_matrix/)
    or [models/TFIDF/tf_idf_matrix](./models/TFIDF/tf_idf_matrix/)).
 4. In [*document_retrieval.py*](./document_retrieval.py), we perform the query-document matching with the chosen set of corpus preprocessing, model, query source and hyperparameters.
