@@ -1,7 +1,5 @@
 """
 Python script useful to create sparse vectors representation of our corpus documents using TF-IDF.
-
-Author: Paulo Ribeiro
 """
 
 import os

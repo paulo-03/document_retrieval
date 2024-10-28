@@ -1,7 +1,5 @@
 """
 Python script to use for document retrieval using TF-IDF or BM25s model.
-
-Author: Paulo Ribeiro
 """
 
 import pandas as pd
@@ -13,11 +11,11 @@ import warnings
 warnings.filterwarnings('ignore')
 
 
-def main(model: str, processing_wanted: str, data_type: str, k1: float):
+def main(model: str, processing_wanted: str, query_source: str, k1: float):
     """Pipeline to retrieve document choosing specific model"""
     # Load the queries
     query = QueryClean(
-        queries_path=f'data/{data_type}.csv',
+        queries_path=f'data/{query_source}.csv',
         processing_wanted=processing_wanted,
         show_progress=False
     )
@@ -47,7 +45,7 @@ def main(model: str, processing_wanted: str, data_type: str, k1: float):
         matches = pd.concat(match_per_lang, ignore_index=True)
 
         # Write on disk a .csv file with the matches
-        matches.to_csv(f'bm25s_{processing_wanted}_k1_{k1}_{data_type}_output.csv',
+        matches.to_csv(f'bm25s_{processing_wanted}_k1_{k1}_{query_source}_output.csv',
                        index=True,
                        index_label='id')
 
@@ -71,7 +69,7 @@ def main(model: str, processing_wanted: str, data_type: str, k1: float):
         matches = pd.concat(match_per_lang, ignore_index=True)
 
         # Write on disk a .csv file with the matches
-        matches.to_csv(f'tf_idf_{processing_wanted}_{data_type}_output.csv',
+        matches.to_csv(f'tf_idf_{processing_wanted}_{query_source}_output.csv',
                        index=True,
                        index_label='id')
 
@@ -85,6 +83,6 @@ if __name__ == '__main__':
             main(
                 processing_wanted=process,  # 'lc', 'lc_sw' or 'lc_sw_l'
                 model='BM25s',  # 'BM25s' or 'TFIDF'
-                data_type='dev',  # 'dev' or 'test'
+                query_source='dev',  # 'dev' or 'test'
                 k1=k1  # Only useful for BM25s model
             )

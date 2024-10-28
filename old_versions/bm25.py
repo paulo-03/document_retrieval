@@ -13,7 +13,7 @@ from tqdm import tqdm
 class BM25_train:
     def __init__(self, corpus_path: str):
         """
-        Initializes the BM25 retriever.
+        Initializes the old_versions retriever.
 
         Args:
             corpus_path: Path to the corpus file.
@@ -87,10 +87,10 @@ class BM25_train:
 class BM25_retriever:
     def     __init__(self, train_path: str, k1: float = 1.5, b: float = 0.75, delta: float = 1.0):
         """
-        Initializes the BM25 retriever.
+        Initializes the old_versions retriever.
 
         Args:
-            train_path: Path to the trained BM25 model.
+            train_path: Path to the trained old_versions model.
             k1: Hyperparameter for term frequency scaling.
             b: Hyperparameter for length normalization.
             delta: Hyperparameter for smoothing.
@@ -127,10 +127,10 @@ class BM25_retriever:
 
     def _score(self, query, document_idx):
         """
-        Computes the BM25 score for a document given a query.
+        Computes the old_versions score for a document given a query.
         :param query: List of query terms
         :param document_idx: Index of the document in the corpus
-        :return: BM25 score for the document
+        :return: old_versions score for the document
         """
         doc_term_count = self.doc_freqs[document_idx]
         doc_length = self.doc_len[document_idx]

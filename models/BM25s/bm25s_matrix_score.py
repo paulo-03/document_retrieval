@@ -1,6 +1,5 @@
 """
 This python script pre-compute the clean corpus matrix score per language.
-Author: Paulo Ribeiro
 """
 
 import os

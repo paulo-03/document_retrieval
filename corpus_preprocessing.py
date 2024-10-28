@@ -1,7 +1,5 @@
 """
 Python script to perform the data processing steps easily and store the results.
-
-Author: Paulo Ribeiro
 """
 
 from data_helpers import CorpusClean

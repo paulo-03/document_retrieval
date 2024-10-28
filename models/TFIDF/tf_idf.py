@@ -1,8 +1,6 @@
 """
 This python script implement the class used to use the TF-IDF method,
 to retrieve documents from a query.
-
-Author: Paulo Ribeiro
 """
 
 import os

@@ -1,4 +1,4 @@
-# Initialize a BM25 model for each language and save them as pickle files.
+# Initialize a old_versions model for each language and save them as pickle files.
 
 from bm25 import BM25_train
 
