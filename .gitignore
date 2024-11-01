@@ -9,3 +9,9 @@
 
 # Ignore all .pkl files
 *.pkl
+
+# Ignore the .gitignore
+.gitignore
+
+
+*.DS_Store
