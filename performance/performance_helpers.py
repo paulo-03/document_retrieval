@@ -124,17 +124,18 @@ def k1_comparison(file_path: str = 'bm25s_aggregate_solutions.csv'):
     solutions = solutions[['process', 'k1', 'correct']].groupby(['process', 'k1']).mean()
 
     # Initialize the plot
-    plt.figure(figsize=(8, 6))
+    plt.figure(figsize=(7, 4))
 
     # Plot using seaborn lineplot for better styling
     sns.lineplot(data=solutions, x='k1', y='correct', hue='process', marker='o')
 
     # Add labels and title
-    plt.xlabel('k1 Value')
-    plt.ylabel('Correct Score')
-    plt.title('Correct Score vs k1 for Different Processes')
+    plt.xlabel('k1 value')
+    plt.ylabel('Recall@10')
+    plt.title('Comparison of hyperparameter k1 for different processes')
 
     # Display the plot
+    plt.savefig("k1_comparison.pdf", format="pdf", bbox_inches="tight")
     plt.show()
 
 
@@ -236,7 +237,7 @@ def models_compare(bm25s_file_path: str = 'bm25s_aggregate_solutions.csv',
     solutions = pd.concat([tf_idf_solutions, bm25s_solutions])
 
     # Set up the figure and axis for a single plot
-    fig, ax = plt.subplots(figsize=(8, 5))
+    fig, ax = plt.subplots(figsize=(7, 4))
 
     # Create a barplot with 'lang' on the x-axis, 'correct' on the y-axis, and 'model' as hue
     sns.barplot(data=solutions, x='process', y='correct', hue='model', ax=ax, errorbar=('ci', 95))
@@ -244,7 +245,7 @@ def models_compare(bm25s_file_path: str = 'bm25s_aggregate_solutions.csv',
     # Customize the plot
     ax.set_title('BM25s vs TF-IDF Performance Comparison by Process')
     ax.set_xlabel('Process')
-    ax.set_ylabel('Correct Score')
+    ax.set_ylabel('Recall@10')
     ax.tick_params(axis='x', rotation=0)
 
     # Add grid lines below the bars
@@ -257,12 +258,13 @@ def models_compare(bm25s_file_path: str = 'bm25s_aggregate_solutions.csv',
     plt.tight_layout()
 
     # Show the plot
+    plt.savefig("model_comparison.pdf", format="pdf", bbox_inches="tight")
     plt.show()
 
 
 def models_compare_per_lang(bm25s_file_path: str = 'bm25s_aggregate_solutions.csv',
                             tf_idf_file_path: str = 'tf_idf_aggregate_solutions.csv',
-                            k1_chosen: float = 1.2):
+                            k1_chosen: float = 1.6):
     """Generate bar plots comparing BM25s and TF-IDF performance for each process, grouped by language."""
 
     # Load the aggregate solution files
@@ -300,7 +302,7 @@ def models_compare_per_lang(bm25s_file_path: str = 'bm25s_aggregate_solutions.cs
         # Customize each subplot
         axes[i].set_title(f'Process: {process}')
         axes[i].set_xlabel('Language')
-        axes[i].set_ylabel('Correct Score')
+        axes[i].set_ylabel('Recall@10')
         axes[i].tick_params(axis='x', rotation=0)
 
         # Add grid lines below the bars
@@ -313,4 +315,5 @@ def models_compare_per_lang(bm25s_file_path: str = 'bm25s_aggregate_solutions.cs
     plt.tight_layout()
 
     # Display the plot
+    plt.savefig("tf_idf_vs_best_bm25_comparison.pdf", format='pdf', bbox_inches="tight")
     plt.show()
